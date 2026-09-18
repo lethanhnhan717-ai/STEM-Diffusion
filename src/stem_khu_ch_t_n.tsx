@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import Plot from 'react-plotly.js';
+import PlotComponent from 'react-plotly.js';
+const Plot = PlotComponent as any;
 import { 
   Menu, Play, Pause, BookOpen, Activity, 
   Layers, Wind, AlertTriangle, Video, Info, X
@@ -122,13 +123,13 @@ const InfoBox = ({ children }) => (
   </div>
 );
 
-const MathBox = ({ children }) => (
+const MathBox = ({ children }: { children?: any }) => (
   <div className="bg-[#f8f9fa] p-4 rounded-lg border border-gray-200 my-4 text-center overflow-x-auto text-lg font-serif italic text-gray-800">
     {children}
   </div>
 );
 
-const Metric = ({ label, value, subtext }) => (
+const Metric = ({ label, value, subtext }: { label: any; value: any; subtext?: any }) => (
   <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col">
     <span className="text-sm text-gray-500 font-medium mb-1">{label}</span>
     <span className="text-2xl font-bold text-gray-800">{value}</span>
@@ -172,8 +173,9 @@ const Page0 = () => {
   const renderPlot = () => {
     const t_data = Array.from({length: currentFrame + 1}, (_, i) => i);
     
+    const d = data as any;
     if (dim.includes("1D")) {
-      const traces = data.x.map((traj, i) => ({
+      const traces: any[] = d.x.map((traj: any) => ({
         x: t_data,
         y: traj.slice(0, currentFrame + 1),
         mode: 'lines',
@@ -184,21 +186,21 @@ const Page0 = () => {
       return <Plot data={traces} layout={{ title: "Quỹ đạo các hạt (1D)", xaxis: { title: "Thời gian (bước)", range: [0, steps] }, yaxis: { title: "Vị trí X" }, autosize: true }} useResizeHandler className="w-full h-[500px]" config={{responsive: true}} />;
     } 
     else if (dim.includes("2D")) {
-      const max_val = Math.max(Math.max(...data.x.map(t=>Math.max(...t.map(Math.abs)))), Math.max(...data.y.map(t=>Math.max(...t.map(Math.abs))))) + 2;
-      const traces = data.x.map((traj, i) => ({
+      const max_val = Math.max(Math.max(...d.x.map((t: any)=>Math.max(...t.map(Math.abs)))), Math.max(...d.y.map((t: any)=>Math.max(...t.map(Math.abs))))) + 2;
+      const traces: any[] = d.x.map((traj: any, i: number) => ({
         x: traj.slice(0, currentFrame + 1),
-        y: data.y[i].slice(0, currentFrame + 1),
+        y: d.y[i].slice(0, currentFrame + 1),
         mode: 'lines', line: { width: 2 }, opacity: 0.7, showlegend: false
       }));
       traces.push({ x: [0], y: [0], mode: 'markers', marker: { color: 'red', size: 12, symbol: 'star' }, name: 'Nguồn' });
       return <Plot data={traces} layout={{ title: "Quỹ đạo (2D - Rời rạc)", xaxis: { title: "Trục X", range: [-max_val, max_val], zeroline: false }, yaxis: { title: "Trục Y", range: [-max_val, max_val], zeroline: false }, autosize: true }} useResizeHandler className="w-full h-[500px]" config={{responsive: true}} />;
     } 
     else {
-      const max_val = Math.max(...[data.x, data.y, data.z].flat(2).map(Math.abs)) + 2;
-      const traces = data.x.map((traj, i) => ({
+      const max_val = Math.max(...[d.x, d.y, d.z].flat(2).map(Math.abs)) + 2;
+      const traces: any[] = d.x.map((traj: any, i: number) => ({
         x: traj.slice(0, currentFrame + 1),
-        y: data.y[i].slice(0, currentFrame + 1),
-        z: data.z[i].slice(0, currentFrame + 1),
+        y: d.y[i].slice(0, currentFrame + 1),
+        z: d.z[i].slice(0, currentFrame + 1),
         type: 'scatter3d', mode: 'lines', line: { width: 3 }, opacity: 0.8, showlegend: false
       }));
       traces.push({ x: [0], y: [0], z: [0], type: 'scatter3d', mode: 'markers', marker: { color: 'red', size: 8, symbol: 'diamond' }, name: 'Nguồn' });
@@ -275,15 +277,16 @@ const Page1 = () => {
   }, [dim, N, steps, D]);
 
   const renderPlot = () => {
+    const d = data as any;
     if (dim === "2 Chiều (2D)") {
-      const traces = data.x.map((traj, i) => ({
-        x: traj, y: data.y[i], mode: 'lines', line: { width: 1.5 }, opacity: 0.7, showlegend: false
+      const traces: any[] = d.x.map((traj: any, i: number) => ({
+        x: traj, y: d.y[i], mode: 'lines', line: { width: 1.5 }, opacity: 0.7, showlegend: false
       }));
       traces.push({ x: [0], y: [0], mode: 'markers', marker: { color: 'red', size: 12, symbol: 'star' }, name: 'Nguồn' });
       return <Plot data={traces} layout={{ title: "Quỹ đạo các hạt (2D)", xaxis: { title: "Trục X", range: [-30, 30], zeroline: false }, yaxis: { title: "Trục Y", range: [-30, 30], zeroline: false }, autosize: true }} useResizeHandler className="w-full h-[500px]" config={{responsive: true}} />;
     } else {
-      const traces = data.x.map((traj, i) => ({
-        x: traj, y: data.y[i], z: data.z[i], type: 'scatter3d', mode: 'lines', line: { width: 2 }, opacity: 0.6, showlegend: false
+      const traces: any[] = d.x.map((traj: any, i: number) => ({
+        x: traj, y: d.y[i], z: d.z[i], type: 'scatter3d', mode: 'lines', line: { width: 2 }, opacity: 0.6, showlegend: false
       }));
       traces.push({ x: [0], y: [0], z: [0], type: 'scatter3d', mode: 'markers', marker: { color: 'red', size: 8, symbol: 'diamond' }, name: 'Nguồn' });
       return <Plot data={traces} layout={{ title: "Quỹ đạo Khuếch tán (3D)", scene: { xaxis: { range: [-30, 30], title: 'X' }, yaxis: { range: [-30, 30], title: 'Y' }, zaxis: { range: [-30, 30], title: 'Z' } }, template: 'plotly_dark', autosize: true, margin: {l:0, r:0, t:40, b:0} }} useResizeHandler className="w-full h-[500px]" config={{responsive: true}} />;
@@ -429,8 +432,9 @@ const Page3 = () => {
     if (tab === 'heatmap') {
       return <Plot data={[{ x: x_final, y: y_final, type: 'histogram2dcontour', colorscale: 'Viridis' }, { x: [0], y: [0], mode: 'markers', marker: { color: 'white', size: 10, symbol: 'x' }, name: 'Nguồn' }]} layout={{ title: "Đám mây ô nhiễm bị gió thổi dạt", template: 'plotly_dark', xaxis: { title: 'X', range: [-10, Math.max(30, vx*steps*dt+10)] }, yaxis: { title: 'Y', range: [-10, Math.max(30, vy*steps*dt+10)] }, autosize: true }} useResizeHandler className="w-full h-[500px]" config={{responsive: true}} />;
     } else {
-      const traces = data.x.slice(0, 100).map((traj, i) => ({
-        x: traj, y: data.y[i], mode: 'lines', line: { width: 1.5 }, opacity: 0.7, showlegend: false
+      const d = data as any;
+      const traces: any[] = d.x.slice(0, 100).map((traj: any, i: number) => ({
+        x: traj, y: d.y[i], mode: 'lines', line: { width: 1.5 }, opacity: 0.7, showlegend: false
       }));
       traces.push({ x: [0], y: [0], mode: 'markers', marker: { color: 'red', size: 12, symbol: 'star' }, name: 'Nguồn' });
       return <Plot data={traces} layout={{ title: "Quỹ đạo các hạt bị cuốn", xaxis: { title: "X" }, yaxis: { title: "Y" }, autosize: true }} useResizeHandler className="w-full h-[500px]" config={{responsive: true}} />;
