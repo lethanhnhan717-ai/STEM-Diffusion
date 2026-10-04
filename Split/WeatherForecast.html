@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPDE: Mô Phỏng Dự Báo Siêu Bão 3D</title>
+    <!-- Tải thư viện Globe.gl để vẽ hình cầu 3D -->
+    <script src="https://unpkg.com/globe.gl"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f8ff;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: #333;
+        }
+        #globeViz {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        /* Giao diện Bảng điều khiển (Glassmorphism) */
+        #sidebar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 340px;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(200, 200, 200, 0.5);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            z-index: 10;
+            max-height: 90vh;
+            overflow-y: auto;
+            color: #1e293b;
+        }
+        h2 {
+            margin-top: 0;
+            font-size: 1.3rem;
+            color: #0284c7;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            padding-bottom: 10px;
+        }
+        .instruction {
+            background: rgba(2, 132, 199, 0.1);
+            border-left: 4px solid #0284c7;
+            padding: 10px;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+            border-radius: 0 8px 8px 0;
+            animation: pulse 2s infinite;
+            color: #0369a1;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(2, 132, 199, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0); }
+        }
+        .control-group { margin-bottom: 18px; }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+            color: #475569;
+        }
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #0284c7;
+        }
+        .val-display {
+            float: right;
+            font-weight: bold;
+            color: #0f172a;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 10px;
+        }
+        button:hover { background: #dc2626; }
+        .footer {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 20px;
+            text-align: justify;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Vùng chứa hình cầu 3D -->
+    <div id="globeViz"></div>
+
+    <!-- Bảng điều khiển tham số -->
+    <div id="sidebar">
+        <h2>🌪️ Mô Phỏng Bão (SPDE)</h2>
+        
+        <div class="instruction">
+            <strong>Tương tác:</strong> Hãy dùng chuột xoay Trái Đất và <b>Click vào đại dương</b> để tạo ra một cơn bão!
+        </div>
+
+        <div class="control-group">
+            <label>Cường độ dòng xiết (Wind Speed) <span class="val-display" id="val-wind">1.5</span></label>
+            <input type="range" id="windSpeed" min="0.1" max="5.0" step="0.1" value="1.5" oninput="updateVal('windSpeed', 'val-wind')">
+        </div>
+
+        <div class="control-group">
+            <label>Lực đẩy cực (Coriolis Effect) <span class="val-display" id="val-coriolis">0.5</span></label>
+            <input type="range" id="coriolis" min="0.0" max="3.0" step="0.1" value="0.5" oninput="updateVal('coriolis', 'val-coriolis')">
+        </div>
+
+        <div class="control-group">
+            <label>Độ nhiễu khí quyển (Noise/Sigma) <span class="val-display" id="val-noise">1.0</span></label>
+            <input type="range" id="noise" min="0.1" max="4.0" step="0.1" value="1.0" oninput="updateVal('noise', 'val-noise')">
+        </div>
+
+        <div class="control-group">
+            <label>Số kịch bản Monte Carlo <span class="val-display" id="val-sims">30</span></label>
+            <input type="range" id="numSims" min="5" max="150" step="5" value="30" oninput="updateVal('numSims', 'val-sims')">
+        </div>
+
+        <div class="control-group">
+            <label>Thời gian dự báo (Ngày) <span class="val-display" id="val-steps">40</span></label>
+            <input type="range" id="steps" min="10" max="100" step="5" value="40" oninput="updateVal('steps', 'val-steps')">
+        </div>
+
+        <button onclick="clearStorms()">🗑️ Xóa toàn bộ bão</button>
+
+        <div class="footer">
+            <b>Cơ sở khoa học:</b> Phương trình Đạo hàm riêng Ngẫu nhiên (SPDE) tính toán sự dịch chuyển vi mô và vĩ mô của hệ thống khí áp. Các đường phát sáng biểu diễn tính biến thiên và sự bất định (uncertainty) của dự báo.
+        </div>
+    </div>
+
+    <script>
+        // Cập nhật giá trị hiển thị trên thanh trượt
+        function updateVal(inputId, displayId) {
+            document.getElementById(displayId).innerText = document.getElementById(inputId).value;
+        }
+
+        // Khởi tạo Trái Đất 3D bằng Globe.gl
+        const world = Globe()
+            (document.getElementById('globeViz'))
+            .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg') // Giao diện ban ngày sáng hơn
+            .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+            .backgroundColor('#f0f8ff');
+
+        // Định dạng cấu trúc hiển thị đường đi (Paths)
+        world.pathPoints('coords')
+            .pathPointLat(p => p[0])
+            .pathPointLng(p => p[1])
+            .pathPointAlt(p => p[2])
+            .pathColor('color')
+            .pathStroke(1.5)
+            .pathDashLength(0.1) // Tạo hiệu ứng đứt đoạn
+            .pathDashGap(0.02)
+            .pathDashAnimateTime(6000); // Hoạt ảnh di chuyển mượt mà
+
+        // Định dạng cấu trúc tâm bão (Labels)
+        world.labelLat(d => d.lat)
+            .labelLng(d => d.lng)
+            .labelText(() => '🌀')
+            .labelSize(3.5)
+            .labelColor(() => 'red')
+            .labelDotRadius(0.5);
+
+        // Lưu trữ dữ liệu bão
+        let stormsPathsData = [];
+        let stormCentersData = [];
+
+        // Hàm tạo số ngẫu nhiên theo phân bố chuẩn Gauss (Box-Muller Transform)
+        function randomNormal(mean = 0, stdev = 1) {
+            let u = 1 - Math.random();
+            let v = Math.random();
+            let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+            return z * stdev + mean;
+        }
+
+        // Bắt sự kiện người dùng Click lên hình cầu
+        world.onGlobeClick((...args) => {
+            let lat, lng;
+            if (typeof args[0] === 'object' && args[0] !== null) {
+                lat = args[0].lat;
+                lng = args[0].lng;
+            } else {
+                lat = args[0];
+                lng = args[1];
+            }
+            // Lấy thông số từ thanh trượt
+            const windSpeed = parseFloat(document.getElementById('windSpeed').value);
+            const coriolis = parseFloat(document.getElementById('coriolis').value);
+            const noise = parseFloat(document.getElementById('noise').value);
+            const numSims = parseInt(document.getElementById('numSims').value);
+            const steps = parseInt(document.getElementById('steps').value);
+            const dt = 1.0;
+
+            // Chạy mô phỏng Monte Carlo (tạo nhiều kịch bản cho 1 điểm click)
+            for (let i = 0; i < numSims; i++) {
+                let currentLat = lat;
+                let currentLon = lng;
+                let path = [[currentLat, currentLon, 0.01]]; // 0.01 là cao độ (Alt) so với mặt đất
+
+                for (let t = 1; t < steps; t++) {
+                    // 1. Tính toán thành phần Đối lưu (Drift/Advection)
+                    // Gió Mậu dịch (Trade winds) thổi Đông-Tây, Tây ôn đới thổi Tây-Đông
+                    let windDir = Math.abs(currentLat) < 30 ? -1 : 1; 
+                    let driftLon = windSpeed * windDir;
+                    
+                    // Hiệu ứng Coriolis đẩy bão dạt về cực (xa xích đạo)
+                    let driftLat = coriolis * Math.sign(currentLat) * Math.abs(Math.sin(currentLat * Math.PI / 180));
+
+                    // 2. Tính toán Nhiễu ngẫu nhiên (Wiener Process)
+                    let noiseLon = randomNormal(0, noise);
+                    let noiseLat = randomNormal(0, noise);
+
+                    // 3. Cập nhật vị trí bằng phương trình Euler-Maruyama cho SDE
+                    currentLon += driftLon * dt + noiseLon * Math.sqrt(dt);
+                    currentLat += driftLat * dt + noiseLat * Math.sqrt(dt);
+
+                    // 4. Chuẩn hóa giới hạn địa lý
+                    currentLat = Math.max(-90, Math.min(90, currentLat)); // Không vượt quá 2 cực
+                    currentLon = ((currentLon + 180) % 360 + 360) % 360 - 180; // Vòng quanh kinh tuyến
+
+                    path.push([currentLat, currentLon, 0.01]);
+                }
+                
+                // Lưu lại kịch bản đường đi, tạo màu ngẫu nhiên sắc Đỏ/Cam/Vàng cho đẹp mắt
+                const opacity = 0.3 + Math.random() * 0.4;
+                stormsPathsData.push({ 
+                    coords: path, 
+                    color: `rgba(${200 + Math.random()*55}, ${50 + Math.random()*150}, 0, ${opacity})` 
+                });
+            }
+
+            // Gắn cờ tại tâm bão ban đầu
+            stormCentersData.push({ lat: lat, lng: lng });
+
+            // Cập nhật lại bản đồ bằng mảng mới để trigger reactivity
+            world.pathsData([...stormsPathsData]);
+            world.labelsData([...stormCentersData]);
+        });
+
+        // Hàm xóa toàn bộ bão
+        function clearStorms() {
+            stormsPathsData = [];
+            stormCentersData = [];
+            world.pathsData([...stormsPathsData]);
+            world.labelsData([...stormCentersData]);
+        }
+
+        // Tự động điều chỉnh kích thước khi thay đổi màn hình
+        window.addEventListener('resize', () => {
+            world.width(window.innerWidth).height(window.innerHeight);
+        });
+    </script>
+</body>
+</html>

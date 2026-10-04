@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mô Phỏng SPDE: Sự Cố Tràn Dầu</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #0b0f19;
+            color: #f8fafc;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: rgba(15, 23, 42, 0.9);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            color: #38bdf8;
+            letter-spacing: 0.5px;
+        }
+
+        .container {
+            flex: 1;
+            position: relative;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .placing-mode {
+            cursor: crosshair !important;
+        }
+
+        .controls-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 340px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            z-index: 20;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .controls-panel h3 {
+            font-size: 1rem;
+            color: #38bdf8;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 8px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+            background: rgba(255,255,255,0.03);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .control-group h4 {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .control-item {
+            margin-bottom: 12px;
+        }
+
+        .control-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-item label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+            color: #cbd5e1;
+        }
+
+        .control-item input[type="range"] {
+            width: 100%;
+            accent-color: #38bdf8;
+            cursor: pointer;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+            font-size: 0.95rem;
+        }
+
+        .btn-primary {
+            background: #0ea5e9;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0284c7;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid #ef4444;
+        }
+
+        .btn-danger:hover {
+            background: #ef4444;
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .btn-active {
+            background: #f59e0b;
+            color: white;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+        }
+
+        .btn-active:hover {
+            background: #d97706;
+        }
+
+        #instruction {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #f8fafc;
+            background: rgba(245, 158, 11, 0.9);
+            border: 1px solid #fbbf24;
+            padding: 12px 24px;
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 10;
+            font-size: 15px;
+            font-weight: 600;
+            box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);
+            display: none;
+            backdrop-filter: blur(5px);
+        }
+
+        .legend {
+            margin-top: 15px;
+            font-size: 0.75rem;
+            color: #64748b;
+            line-height: 1.5;
+            text-align: justify;
+        }
+
+        /* Responsive Layout */
+        @media (max-width: 900px) {
+            .controls-panel {
+                transform: scale(0.85);
+                transform-origin: top right;
+                width: 340px;
+                top: 10px; right: 10px;
+            }
+        }
+        @media (max-width: 600px) {
+            .controls-panel {
+                transform: scale(0.7);
+                transform-origin: top right;
+                width: 320px;
+            }
+            header h1 { font-size: 1rem; }
+        }
+
+        /* Loading Overlay */
+        #loading {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #0b0f19;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: #38bdf8;
+            font-size: 1.2rem;
+            font-weight: bold;
+            transition: opacity 0.5s;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading">Đang tải mô phỏng SPDE...</div>
+
+    <header>
+        <h1>Mô Phỏng SPDE: Sự Cố Tràn Dầu</h1>
+        <div id="status-text" style="font-size: 0.9rem; color: #94a3b8;">
+            Động lực học chất lưu: Phương trình Advection-Diffusion & Random Walk
+        </div>
+    </header>
+
+    <div class="container">
+        <div id="instruction">⚓ Chế độ Đặt Nguồn BẬT: Click lên mặt biển để tạo điểm tràn dầu.</div>
+        <div id="canvas-container"></div>
+
+        <div class="controls-panel">
+            <h3>Tham Số Vật Lý (SPDE)</h3>
+            
+            <div class="control-group">
+                <h4>Advection (Dòng chảy & Gió)</h4>
+                <div class="control-item">
+                    <label>Hải lưu X: <span id="val-flowX">1.5</span></label>
+                    <input type="range" id="param-flowX" min="-5" max="5" step="0.1" value="1.5" 
+                        oninput="updateParam('flowX', this.value)">
+                </div>
+                <div class="control-item">
+                    <label>Hải lưu Z: <span id="val-flowZ">0.5</span></label>
+                    <input type="range" id="param-flowZ" min="-5" max="5" step="0.1" value="0.5" 
+                        oninput="updateParam('flowZ', this.value)">
+                </div>
+                <div class="control-item">
+                    <label>Gió X (Tác động bề mặt): <span id="val-windX">-2.0</span></label>
+                    <input type="range" id="param-windX" min="-5" max="5" step="0.1" value="-2.0" 
+                        oninput="updateParam('windX', this.value)">
+                </div>
+                <div class="control-item">
+                    <label>Gió Z (Tác động bề mặt): <span id="val-windZ">1.0</span></label>
+                    <input type="range" id="param-windZ" min="-5" max="5" step="0.1" value="1.0" 
+                        oninput="updateParam('windZ', this.value)">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Diffusion & Random Walk</h4>
+                <div class="control-item">
+                    <label>Khuếch tán (Độ loang): <span id="val-diff">2.0</span></label>
+                    <input type="range" id="param-diff" min="0" max="10" step="0.1" value="2.0" 
+                        oninput="updateParam('diff', this.value)">
+                </div>
+                <div class="control-item">
+                    <label>Cuộn rối (Turbulence/Noise): <span id="val-turb">4.3</span></label>
+                    <input type="range" id="param-turb" min="0" max="10" step="0.1" value="4.3" 
+                        oninput="updateParam('turb', this.value)">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-primary" id="btn-toggle-place" onclick="togglePlaceMode()">Tạo Vết Dầu</button>
+                <button class="btn btn-danger" onclick="clearSources()">Xóa Nguồn</button>
+            </div>
+            <button class="btn btn-active" id="btn-pause" onclick="togglePause()" style="background: #8b5cf6;">⏸ Tạm Dừng Mô Phỏng</button>
+
+            <div class="legend">
+                <b>Nguyên lý Vật lý:</b><br>
+                • <b>Advection (Đối lưu):</b> Dầu trôi theo vector tổng hợp của dòng chảy và sức gió.<br>
+                • <b>Diffusion (Khuếch tán):</b> Phân phối chuẩn, phương sai tỉ lệ với thời gian (t) nên bán kính loang tỉ lệ với căn bậc hai thời gian (√t) - đặc trưng của Random Walk.<br>
+                • <b>Turbulence (Stochastic):</b> Bổ sung yếu tố ngẫu nhiên (FBM Noise) tạo ra sự cuộn rối trong môi trường động. Dầu nhẹ hơn nước nên tính toán giới hạn chủ yếu ở bề mặt (Buoyancy).
+            </div>
+        </div>
+    </div>
+
+    <!-- Thư viện Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let waterPlane, waterGrid, volumeMesh;
+        const clock = new THREE.Clock();
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        
+        // Quản lý trạng thái nguồn
+        const MAX_SOURCES = 20;
+        let sourceMarkers = [];
+        const state = {
+            isPlacingMode: false,
+            isPaused: false,
+            numSources: 0,
+            sources: new Float32Array(MAX_SOURCES * 3),
+            sourceTimes: new Float32Array(MAX_SOURCES),
+            sourceAdvections: new Float32Array(MAX_SOURCES * 2),
+            sourceDiffusions: new Float32Array(MAX_SOURCES)
+        };
+
+        const simulationParams = {
+            flowX: 1.5, flowZ: 0.5,
+            windX: -2.0, windZ: 1.0,
+            diff: 2.0, turb: 4.3
+        };
+
+        let lastTime = 0;
+        let simulationTime = 0; // Thời gian ảo cho Pause/Play
+        let globalAdvection = new THREE.Vector2(0, 0);
+        let globalDiffusion = 0;
+
+        // Cấu hình Hệ Hạt (Particle System)
+        const MAX_PARTICLES = 5000;
+        let particleMesh;
+        const particleData = [];
+        let currentParticleIdx = 0;
+
+        // Uniforms cho Volumetric Raymarching Shader
+        const uniforms = {
+            u_time: { value: 0.0 },
+            u_cameraPos: { value: new THREE.Vector3() },
+            
+            u_numSources: { value: 0 },
+            u_sources: { value: state.sources },
+            u_sourceTimes: { value: state.sourceTimes },
+            
+            u_globalAdvection: { value: globalAdvection },
+            u_globalDiffusion: { value: globalDiffusion },
+            u_sourceAdvections: { value: state.sourceAdvections },
+            u_sourceDiffusions: { value: state.sourceDiffusions },
+            u_turbulence: { value: 4.3 },
+            
+            // Giới hạn vùng tính toán Raymarching - sát mặt nước vì dầu nổi
+            u_boxMin: { value: new THREE.Vector3(-200, -20, -200) },
+            u_boxMax: { value: new THREE.Vector3(200, 5, 200) }
+        };
+
+        const vertexShader = `
+            varying vec3 vWorldPosition;
+            void main() {
+                vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                vWorldPosition = worldPosition.xyz;
+                gl_Position = projectionMatrix * viewMatrix * worldPosition;
+            }
+        `;
+
+        const fragmentShader = `
+            precision highp float;
+            varying vec3 vWorldPosition;
+            
+            uniform vec3 u_cameraPos;
+            uniform float u_time;
+            uniform int u_numSources;
+            uniform vec3 u_sources[${MAX_SOURCES}];
+            uniform float u_sourceTimes[${MAX_SOURCES}];
+            
+            uniform vec2 u_globalAdvection;
+            uniform float u_globalDiffusion;
+            uniform vec2 u_sourceAdvections[${MAX_SOURCES}];
+            uniform float u_sourceDiffusions[${MAX_SOURCES}];
+            
+            uniform float u_turbulence;
+            
+            uniform vec3 u_boxMin; uniform vec3 u_boxMax;
+
+            // Hàm tạo nhiễu ngẫu nhiên 3D (Value Noise cơ bản cho tốc độ)
+            float hash(vec3 p) {
+                p = fract(p * 0.3183099 + .1);
+                p *= 17.0;
+                return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+            }
+            float noise(in vec3 x) {
+                vec3 i = floor(x);
+                vec3 f = fract(x);
+                f = f*f*(3.0-2.0*f);
+                return mix(mix(mix(hash(i+vec3(0,0,0)), hash(i+vec3(1,0,0)),f.x),
+                               mix(hash(i+vec3(0,1,0)), hash(i+vec3(1,1,0)),f.x),f.y),
+                           mix(mix(hash(i+vec3(0,0,1)), hash(i+vec3(1,0,1)),f.x),
+                               mix(hash(i+vec3(0,1,1)), hash(i+vec3(1,1,1)),f.x),f.y),f.z);
+            }
+            // Fractal Brownian Motion (FBM) để tạo Turbulance
+            float fbm(vec3 p) {
+                float f = 0.0; float amp = 0.5;
+                for(int i=0; i<2; i++) {
+                    f += amp * noise(p);
+                    p *= 2.0; amp *= 0.5;
+                }
+                return f;
+            }
+
+            // Giao cắt khối hộp (AABB)
+            vec2 intersectAABB(vec3 ro, vec3 rd, vec3 boxMin, vec3 boxMax) {
+                vec3 tMin = (boxMin - ro) / rd;
+                vec3 tMax = (boxMax - ro) / rd;
+                vec3 t1 = min(tMin, tMax);
+                vec3 t2 = max(tMin, tMax);
+                float tNear = max(max(t1.x, t1.y), t1.z);
+                float tFar = min(min(t2.x, t2.y), t2.z);
+                return vec2(tNear, tFar);
+            }
+
+            // Mật độ của dầu tại một điểm (Sát với thực tế: Nổi và Khuếch tán Random Walk)
+            float getDensity(vec3 p) {
+                float totalDensity = 0.0;
+                
+                // 1. TẠO CUỘN RỐI (TURBULENCE / STOCHASTIC NOISE)
+                vec3 warp = vec3(
+                    fbm(p * 0.03 + u_time * 0.2),
+                    fbm(p * 0.03 + vec3(12.3, 45.6, 78.9) - u_time * 0.1),
+                    fbm(p * 0.03 + vec3(98.7, 65.4, 32.1) + u_time * 0.15)
+                );
+                warp = (warp - 0.5) * 2.0;
+                vec3 pWarp = p + warp * u_turbulence * 2.5;
+
+                // 2. ĐỐI LƯU & KHUẾCH TÁN (TÍCH PHÂN TỪ JAVASCRIPT ĐỂ GIỮ TRẠNG THÁI)
+                for(int i=0; i<${MAX_SOURCES}; i++) {
+                    if (i >= u_numSources) break;
+                    
+                    float age = max(0.0, u_time - u_sourceTimes[i]);
+                    if (age <= 0.0) continue;
+
+                    vec3 sourceOrigin = u_sources[i];
+                    
+                    // Tính độ dời tích phân từ lúc nguồn được tạo
+                    vec2 advOffset = u_globalAdvection - u_sourceAdvections[i];
+                    vec3 currentEnd = sourceOrigin + vec3(advOffset.x, 0.0, advOffset.y);
+                    
+                    // Tính khoảng cách tới dải trôi
+                    vec3 pa = pWarp - sourceOrigin;
+                    vec3 ba = currentEnd - sourceOrigin;
+                    float ba2 = dot(ba, ba);
+                    
+                    // Nếu dải trôi quá ngắn (không có dòng chảy), dầu tụ lại thành hình cầu lớn (h = 1.0)
+                    float h = (ba2 > 0.0001) ? clamp(dot(pa, ba)/ba2, 0.0, 1.0) : 1.0;
+                    
+                    // 3. KHUẾCH TÁN (DIFFUSION - RANDOM WALK TÍCH PHÂN)
+                    float diffArea = max(0.0, u_globalDiffusion - u_sourceDiffusions[i]);
+                    float radius = 1.0 + sqrt(diffArea * h) * 0.8;
+                    
+                    float dist = length(pa - ba*h);
+                    
+                    // Viền mềm mại
+                    float density = smoothstep(radius, radius * 0.1, dist);
+                    
+                    // 4. ĐỘ NỔI (BUOYANCY)
+                    // Dầu nhẹ hơn nước nên nổi trên bề mặt, phân rã mạnh theo độ sâu Y
+                    float depthDecay = exp(-abs(p.y) * 0.5); // Giảm nhanh khi chìm xuống
+                    density *= depthDecay;
+                    
+                    // Phai nhạt hóa chất theo thời gian (Bay hơi / Phân tán)
+                    density *= exp(-age * 0.005);
+                    
+                    totalDensity += density;
+                }
+                
+                return clamp(totalDensity, 0.0, 1.0);
+            }
+
+            void main() {
+                vec3 rayDir = normalize(vWorldPosition - u_cameraPos);
+                vec3 rayOrigin = u_cameraPos;
+                
+                vec2 tHit = intersectAABB(rayOrigin, rayDir, u_boxMin, u_boxMax);
+                if (tHit.x > tHit.y || tHit.y < 0.0) discard;
+                
+                float t0 = max(tHit.x, 0.0);
+                float t1 = tHit.y;
+                
+                const int MAX_STEPS = 20;
+                float stepSize = (t1 - t0) / float(MAX_STEPS);
+                vec3 p = rayOrigin + rayDir * t0;
+                
+                vec3 col = vec3(0.0);
+                float alpha = 0.0;
+                
+                for(int i = 0; i < MAX_STEPS; i++) {
+                    float d = getDensity(p);
+                    if (d > 0.01) {
+                        // Màu dầu: Lõi đen/nâu sẫm, viền mỏng có hiệu ứng óng ánh (iridescence)
+                        vec3 oilDark = vec3(0.05, 0.04, 0.03); 
+                        vec3 oilEdge = vec3(0.3, 0.25, 0.15);
+                        
+                        // Ánh vệt màng mỏng (thin film interference)
+                        vec3 iridescence = 0.6 + 0.4 * cos(u_time * 0.5 + p.x * 0.1 + vec3(0, 2, 4));
+                        
+                        vec3 particleColor = mix(oilEdge, oilDark, smoothstep(0.0, 0.6, d));
+                        
+                        if(d < 0.3 && p.y > -2.0) { // Cầu vồng nhẹ ở lớp mỏng bề mặt
+                            particleColor = mix(iridescence, particleColor, smoothstep(0.05, 0.3, d));
+                        }
+
+                        float stepAlpha = d * 0.25; 
+                        
+                        col += particleColor * stepAlpha * (1.0 - alpha);
+                        alpha += stepAlpha * (1.0 - alpha);
+                    }
+                    if (alpha > 0.99) break; 
+                    
+                    p += rayDir * stepSize;
+                }
+                
+                if (alpha < 0.01) discard;
+                gl_FragColor = vec4(col, alpha);
+            }
+        `;
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0b0f19, 0.002);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+            camera.position.set(60, 40, 120);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 + 0.1; // Nhìn ngang mặt nước
+            controls.minDistance = 20;
+            controls.maxDistance = 300;
+
+            setupEnvironment();
+            setupVolume();
+            setupParticles();
+            setupInteraction();
+
+            window.addEventListener('resize', onWindowResize);
+            
+            // Ẩn loading
+            setTimeout(() => {
+                const loader = document.getElementById('loading');
+                loader.style.opacity = '0';
+                setTimeout(() => loader.style.display = 'none', 500);
+            }, 500);
+
+            animate();
+        }
+
+        function setupEnvironment() {
+            // Mặt nước nhấp nhô (Nhiều segments để tạo sóng)
+            const waterGeo = new THREE.PlaneGeometry(600, 600, 30, 30);
+            waterGeo.rotateX(-Math.PI / 2);
+            
+            // Chất liệu mặt nước
+            const waterMat = new THREE.MeshBasicMaterial({ 
+                color: 0x0ea5e9, 
+                transparent: true, 
+                opacity: 0.15,
+                depthWrite: false
+            });
+            waterPlane = new THREE.Mesh(waterGeo, waterMat);
+            scene.add(waterPlane);
+
+            // Lưới trên mặt biển (Grid lưới) dùng chung geometry với mặt nước
+            const gridMat = new THREE.MeshBasicMaterial({
+                color: 0x38bdf8,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.15,
+                depthWrite: false
+            });
+            waterGrid = new THREE.Mesh(waterGeo, gridMat);
+            scene.add(waterGrid);
+        }
+
+        function setupParticles() {
+            // Ánh sáng cho hạt
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(20, 50, 20);
+            scene.add(dirLight);
+
+            // InstancedMesh cho hạt dầu
+            const particleGeo = new THREE.SphereGeometry(0.6, 8, 8);
+            const particleMat = new THREE.MeshStandardMaterial({
+                color: 0x111111,
+                roughness: 0.3,
+                metalness: 0.8
+            });
+            particleMesh = new THREE.InstancedMesh(particleGeo, particleMat, MAX_PARTICLES);
+            scene.add(particleMesh);
+
+            for(let i=0; i<MAX_PARTICLES; i++) {
+                particleData.push({ active: false, pos: new THREE.Vector3(), age: 0 });
+                particleMesh.setMatrixAt(i, new THREE.Matrix4().makeScale(0,0,0));
+            }
+            particleMesh.instanceMatrix.needsUpdate = true;
+        }
+
+        function setupVolume() {
+            // Bounding box bọc khu vực tính toán raymarching (Y: -20 đến 5)
+            const boxGeo = new THREE.BoxGeometry(400, 25, 400);
+            boxGeo.translate(0, -7.5, 0); 
+
+            const shaderMat = new THREE.ShaderMaterial({
+                vertexShader: vertexShader,
+                fragmentShader: fragmentShader,
+                uniforms: uniforms,
+                transparent: true,
+                side: THREE.BackSide,
+                depthWrite: false
+            });
+
+            volumeMesh = new THREE.Mesh(boxGeo, shaderMat);
+            scene.add(volumeMesh);
+        }
+
+        // Cập nhật giá trị tham số từ UI
+        window.updateParam = function(key, value) {
+            document.getElementById('val-' + key).innerText = parseFloat(value).toFixed(1);
+            simulationParams[key] = parseFloat(value);
+            if(key === 'turb') uniforms.u_turbulence.value = simulationParams.turb;
+        };
+
+        // Bật/tắt chế độ click mặt nước đặt điểm dầu
+        window.togglePlaceMode = function() {
+            state.isPlacingMode = !state.isPlacingMode;
+            const btn = document.getElementById('btn-toggle-place');
+            const instruction = document.getElementById('instruction');
+            const container = document.getElementById('canvas-container');
+            
+            if(state.isPlacingMode) {
+                controls.enabled = false;
+                instruction.style.display = 'block';
+                container.classList.add('placing-mode');
+                btn.innerText = 'Đang BẬT: Click để Đặt Nguồn';
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-active');
+            } else {
+                controls.enabled = true;
+                instruction.style.display = 'none';
+                container.classList.remove('placing-mode');
+                btn.innerText = 'Bật Chế Độ Đặt Tràn Dầu';
+                btn.classList.add('btn-primary');
+                btn.classList.remove('btn-active');
+            }
+        };
+
+        window.togglePause = function() {
+            state.isPaused = !state.isPaused;
+            const btn = document.getElementById('btn-pause');
+            if (state.isPaused) {
+                btn.innerText = '▶ Tiếp Tục Mô Phỏng';
+                btn.style.background = '#10b981';
+            } else {
+                btn.innerText = '⏸ Tạm Dừng Mô Phỏng';
+                btn.style.background = '#8b5cf6';
+            }
+        };
+
+        // Xóa mọi nguồn dầu
+        window.clearSources = function() {
+            state.numSources = 0;
+            uniforms.u_numSources.value = 0;
+            sourceMarkers.forEach(m => scene.remove(m));
+            sourceMarkers = [];
+            
+            // Xóa tất cả hạt
+            for(let i=0; i<MAX_PARTICLES; i++) {
+                particleData[i].active = false;
+                particleMesh.setMatrixAt(i, new THREE.Matrix4().makeScale(0,0,0));
+            }
+            particleMesh.instanceMatrix.needsUpdate = true;
+        };
+
+        function setupInteraction() {
+            window.addEventListener('pointerdown', (event) => {
+                if (!state.isPlacingMode || event.button !== 0) return;
+
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObject(waterPlane);
+
+                if (intersects.length > 0 && state.numSources < MAX_SOURCES) {
+                    const p = intersects[0].point;
+                    const idx = state.numSources;
+                    
+                    state.sources[idx * 3] = p.x;
+                    state.sources[idx * 3 + 1] = 0.0;
+                    state.sources[idx * 3 + 2] = p.z;
+                    
+                    state.sourceTimes[idx] = clock.getElapsedTime();
+                    
+                    state.sourceAdvections[idx * 2] = globalAdvection.x;
+                    state.sourceAdvections[idx * 2 + 1] = globalAdvection.y;
+                    state.sourceDiffusions[idx] = globalDiffusion;
+                    
+                    state.numSources++;
+                    uniforms.u_numSources.value = state.numSources;
+
+                    // Marker nhỏ màu cam/đen trên mặt nước
+                    const markerGeo = new THREE.SphereGeometry(1.5, 16, 16);
+                    const markerMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+                    const marker = new THREE.Mesh(markerGeo, markerMat);
+                    marker.position.copy(p);
+                    scene.add(marker);
+                    sourceMarkers.push(marker);
+                }
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            let realTime = clock.getElapsedTime();
+            let dt = realTime - lastTime;
+            if (dt > 0.1) dt = 0.1; 
+            lastTime = realTime;
+
+            if (!state.isPaused) {
+                simulationTime += dt;
+
+                // Tích phân vận tốc và độ khuếch tán để tạo mô phỏng động tĩnh
+                globalAdvection.x += (simulationParams.flowX + simulationParams.windX * 0.8) * dt;
+                globalAdvection.y += (simulationParams.flowZ + simulationParams.windZ * 0.8) * dt;
+                globalDiffusion += Math.max(0, simulationParams.diff) * dt;
+
+                uniforms.u_globalDiffusion.value = globalDiffusion;
+                uniforms.u_time.value = simulationTime;
+
+                // Cấp phát hạt liên tục
+                for (let s = 0; s < state.numSources; s++) {
+                    for(let k=0; k<2; k++) { // 2 hạt / frame / nguồn
+                        let p = particleData[currentParticleIdx];
+                        p.active = true;
+                        p.pos.set(state.sources[s*3], state.sources[s*3+1], state.sources[s*3+2]);
+                        p.age = 0;
+                        currentParticleIdx = (currentParticleIdx + 1) % MAX_PARTICLES;
+                    }
+                }
+            }
+
+            // Cập nhật Hệ Hạt (SDE: Advection + Random Walk)
+            const dummy = new THREE.Object3D();
+            for(let i=0; i<MAX_PARTICLES; i++) {
+                let p = particleData[i];
+                if(!p.active) continue;
+                
+                if(!state.isPaused) {
+                    p.age += dt;
+                    
+                    // Advection
+                    p.pos.x += (simulationParams.flowX + simulationParams.windX * 0.8) * dt;
+                    p.pos.z += (simulationParams.flowZ + simulationParams.windZ * 0.8) * dt;
+                    
+                    // Random Walk (Diffusion) sử dụng Box-Muller transform tạo Gauss Noise
+                    let diffAmt = simulationParams.diff * 0.8;
+                    let u1 = Math.random(), u2 = Math.random();
+                    if(u1 < 1e-6) u1 = 1e-6; // Tránh log(0)
+                    let z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+                    let z1 = Math.sqrt(-2.0 * Math.log(u1)) * Math.sin(2.0 * Math.PI * u2);
+                    
+                    p.pos.x += diffAmt * z0 * Math.sqrt(dt);
+                    p.pos.z += diffAmt * z1 * Math.sqrt(dt);
+                }
+                
+                // Nổi trên sóng biển
+                p.pos.y = Math.sin(p.pos.x * 0.04 + simulationTime) * Math.cos(p.pos.z * 0.04 + simulationTime) * 1.5;
+                
+                // Scale (nhỏ dần)
+                let scale = Math.max(0, 1.0 - p.age / 20.0);
+                if (scale === 0) {
+                    p.active = false;
+                    dummy.scale.set(0,0,0);
+                } else {
+                    dummy.position.copy(p.pos);
+                    dummy.scale.set(scale, scale, scale);
+                }
+                dummy.updateMatrix();
+                particleMesh.setMatrixAt(i, dummy.matrix);
+            }
+            if(particleMesh) particleMesh.instanceMatrix.needsUpdate = true;
+
+            uniforms.u_cameraPos.value.copy(camera.position);
+
+            // Mô phỏng sóng biển (Cập nhật Vertex của mặt nước)
+            if (waterPlane && waterPlane.geometry) {
+                const positions = waterPlane.geometry.attributes.position;
+                for (let i = 0; i < positions.count; i++) {
+                    const x = positions.getX(i);
+                    const z = positions.getZ(i);
+                    const y = Math.sin(x * 0.04 + simulationTime) * Math.cos(z * 0.04 + simulationTime) * 1.5;
+                    positions.setY(i, y);
+                }
+                positions.needsUpdate = true;
+            }
+
+            if (controls.enabled) controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
