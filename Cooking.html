@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mô Phỏng Chuyển Động Brown </title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #0b0f19;
+            color: #f8fafc;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: rgba(15, 23, 42, 0.9);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            color: #38bdf8;
+            letter-spacing: 0.5px;
+        }
+
+        .container {
+            flex: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* MÀN HÌNH MACRO (NỒI ĐUN NƯỚC) */
+        #macro-view {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #1e293b 0%, #0b0f19 100%);
+            transition: opacity 0.5s ease;
+        }
+
+        .stove-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .pot {
+            position: relative;
+            width: 320px;
+            height: 200px;
+            background: linear-gradient(90deg, #64748b, #94a3b8, #64748b);
+            border-bottom-left-radius: 40px;
+            border-bottom-right-radius: 40px;
+            border-top: 5px solid #475569;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+        }
+
+        .pot-handle-left,
+        .pot-handle-right {
+            position: absolute;
+            top: 40px;
+            width: 40px;
+            height: 25px;
+            border: 6px solid #64748b;
+            border-radius: 10px;
+        }
+
+        .pot-handle-left {
+            left: -42px;
+            border-right: none;
+        }
+
+        .pot-handle-right {
+            right: -42px;
+            border-left: none;
+        }
+
+        .water {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 150px;
+            background: rgba(14, 165, 233, 0.35);
+            backdrop-filter: blur(2px);
+            transition: background 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .water:hover {
+            background: rgba(14, 165, 233, 0.5);
+        }
+
+        .water-text {
+            font-weight: bold;
+            font-size: 1.1rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+        }
+
+        .stove {
+            width: 280px;
+            height: 30px;
+            background: #334155;
+            border-radius: 15px;
+            margin-top: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .fire {
+            position: absolute;
+            bottom: 30px;
+            width: 200px;
+            height: 40px;
+            display: flex;
+            justify-content: space-around;
+            opacity: 0;
+            transition: opacity 0.4s;
+        }
+
+        .fire.active {
+            opacity: 1;
+        }
+
+        .flame {
+            width: 25px;
+            height: 40px;
+            background: linear-gradient(to top, #f97316, #eab308);
+            border-radius: 50% 50% 20% 20%;
+            animation: flicker 0.4s infinite alternate;
+        }
+
+        .flame:nth-child(2) {
+            animation-delay: 0.15s;
+            height: 50px;
+        }
+
+        .flame:nth-child(3) {
+            animation-delay: 0.3s;
+            height: 35px;
+        }
+
+        @keyframes flicker {
+            0% {
+                transform: scaleY(0.9) skewX(-2deg);
+                background: #ef4444;
+            }
+
+            100% {
+                transform: scaleY(1.1) skewX(2deg);
+                background: #facc15;
+            }
+        }
+
+        /* MÀN HÌNH 3D MICRO */
+        #micro-view {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: none;
+            background: #0b0f19;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* BẢNG ĐIỀU KHIỂN & GIAO DIỆN PHỤ */
+        .controls-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 320px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            z-index: 20;
+            display: none;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .controls-panel h3 {
+            font-size: 1rem;
+            color: #38bdf8;
+            margin-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 6px;
+        }
+
+        .control-item {
+            margin-bottom: 12px;
+        }
+
+        .control-item label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+            color: #cbd5e1;
+        }
+
+        .control-item input[type="range"] {
+            width: 100%;
+            accent-color: #38bdf8;
+            cursor: pointer;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 8px;
+        }
+
+        .btn-primary {
+            background: #0ea5e9;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0284c7;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-secondary {
+            background: #475569;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #334155;
+        }
+
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 20;
+            display: none;
+            padding: 10px 18px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .back-btn:hover {
+            background: rgba(30, 41, 59, 0.95);
+        }
+
+        .macro-controls {
+            margin-top: 25px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .legend {
+            margin-top: 10px;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            line-height: 1.4;
+        }
+
+        /* Responsive Controls Panel */
+        @media (max-width: 900px) {
+            .controls-panel {
+                transform: scale(0.8);
+                transform-origin: top right;
+                top: 50px;
+                right: 10px;
+            }
+        }
+        @media (max-width: 500px) {
+            .controls-panel {
+                transform: scale(0.65);
+                transform-origin: top right;
+            }
+            .back-btn {
+                transform: scale(0.8);
+                transform-origin: top left;
+            }
+        }
+    </style>
+    <!-- Thư viện Three.js để dựng mô hình 3D -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+
+<body>
+
+    <header>
+        <h1>Mô Phỏng Chuyển Động Brown & Va Chạm Đàn Hồi Phân Tử</h1>
+        <div id="status-text" style="font-size: 0.9rem; color: #94a3b8;">Trạng thái: Đang ở chế độ vĩ mô (Nồi nước)
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Giao diện Nồi nước (Macro View) -->
+        <div id="macro-view">
+            <div class="stove-container" onclick="enterMicroView()">
+                <div class="pot">
+                    <div class="pot-handle-left"></div>
+                    <div class="pot-handle-right"></div>
+                    <div class="water">
+                        <div class="water-text">Nhấn vào nước để vào Mô phỏng 3D<br><span
+                                style="font-size:0.8rem; font-weight:normal;">(Va chạm đàn hồi & Chuyển động
+                                Brown)</span></div>
+                    </div>
+                </div>
+                <div class="stove">
+                    <div class="fire" id="macro-fire">
+                        <div class="flame"></div>
+                        <div class="flame"></div>
+                        <div class="flame"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="macro-controls">
+                <button class="btn btn-primary" id="toggle-stove-btn" onclick="toggleStove(event)">Bật bếp lửa</button>
+            </div>
+        </div>
+
+        <!-- Nút quay lại -->
+        <button class="back-btn" id="back-btn" onclick="returnToMacroView()">← Quay lại Nồi nước</button>
+
+        <!-- Mô phỏng 3D Micro View -->
+        <div id="micro-view">
+            <div id="canvas-container"></div>
+        </div>
+
+        <!-- Bảng điều khiển tham số mô phỏng 3D -->
+        <div class="controls-panel" id="controls-panel">
+            <h3>Tham Số Mô Phỏng 3D</h3>
+
+            <div class="control-item">
+                <label>Năng lượng (Nhiệt độ): <span id="val-temp">0.1</span></label>
+                <input type="range" id="param-temp" min="0.1" max="5.0" step="0.1" value="0.1" title="0.1"
+                    oninput="this.title=this.value; document.getElementById('val-temp').innerText=parseFloat(this.value).toFixed(1); params.temperature=parseFloat(this.value);">
+            </div>
+
+            <div class="control-item">
+                <label>Kích thước hạt khác: <span id="val-size">0.5</span></label>
+                <input type="range" id="param-size" min="0.5" max="2.5" step="0.1" value="0.5" title="0.5"
+                    oninput="this.title=this.value; document.getElementById('val-size').innerText=parseFloat(this.value).toFixed(1); params.particleSize=parseFloat(this.value); updateParticlesConfig();">
+            </div>
+
+            <div class="control-item">
+                <label>Khối lượng phân tử: <span id="val-mass">0.2</span></label>
+                <input type="range" id="param-mass" min="0.2" max="5.0" step="0.2" value="0.2" title="0.2"
+                    oninput="this.title=this.value; document.getElementById('val-mass').innerText=parseFloat(this.value).toFixed(1); params.particleMass=parseFloat(this.value); updateParticlesConfig();">
+            </div>
+
+            <div class="control-item">
+                <label>Thêm hạt phụ: <span id="val-extra">0</span></label>
+                <input type="range" id="param-extra" min="0" max="150" step="10" value="0" title="0"
+                    oninput="this.title=this.value; document.getElementById('val-extra').innerText=this.value; params.extraCount=parseInt(this.value); adjustExtraParticles();">
+            </div>
+
+            <button class="btn btn-primary" id="toggle-trail-btn" onclick="toggleTrails()">Bật/Tắt Đường Đi (10
+                hạt)</button>
+            <button class="btn btn-primary" onclick="toggleStoveMicro()" id="stove-micro-btn"
+                style="margin-top: 6px; background: #0ea5e9;">Bật Bếp Lửa</button>
+
+            <div class="legend">
+                • <b>10 hạt đầu tiên</b> có màu sắc độc lập và giữ vết quỹ đạo.<br>
+                • Áp dụng định luật bảo toàn động lượng và va chạm đàn hồi hoàn toàn với thành nồi & các hạt.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Biến toàn cục trạng thái ứng dụng ---
+        let stoveIsOn = false;
+        let inMicroView = false;
+
+        // Các tham số mô phỏng vật lý
+        let params = {
+            temperature: 0.1,
+            particleSize: 0.5,
+            particleMass: 0.2,
+            extraCount: 0,
+            showTrails: false
+        };
+
+        // Biến Three.js
+        let scene, camera, renderer, animationFrameId = null, controls = null;
+        let particles = [];
+        let potRadius = 15;
+        let potHeight = 25; // Thành nồi 3D giới hạn hạt hình trụ
+        let trackedLines = []; // Mảng lưu các đường đi của 10 hạt đầu
+
+        // Màu sắc cho 10 hạt đầu tiên
+        const trackedColors = [
+            0xff4500, 0x00ffff, 0xff00ff, 0xffff00, 0x00ff00,
+            0xff1493, 0x1e90ff, 0xffd700, 0xadff2f, 0xff69b4
+        ];
+
+        // --- Cập nhật Nhiệt độ từ từ theo trạng thái Bếp ---
+        setInterval(() => {
+            let targetTemp = stoveIsOn ? 5.0 : 0.1;
+            if (Math.abs(params.temperature - targetTemp) > 0.01) {
+                let step = stoveIsOn ? 0.05 : -0.05;
+                params.temperature += step;
+
+                if (stoveIsOn && params.temperature > 5.0) params.temperature = 5.0;
+                if (!stoveIsOn && params.temperature < 0.1) params.temperature = 0.1;
+
+                let tempSlider = document.getElementById('param-temp');
+                if (tempSlider) {
+                    tempSlider.value = params.temperature;
+                    document.getElementById('val-temp').innerText = params.temperature.toFixed(1);
+                    tempSlider.title = params.temperature.toFixed(1);
+                }
+            }
+        }, 50);
+
+        function syncStoveUI() {
+            const fire = document.getElementById('macro-fire');
+            const macroBtn = document.getElementById('toggle-stove-btn');
+            const microBtn = document.getElementById('stove-micro-btn');
+
+            if (stoveIsOn) {
+                if (fire) fire.classList.add('active');
+                if (macroBtn) { macroBtn.innerText = 'Tắt bếp lửa'; macroBtn.style.background = '#ef4444'; }
+                if (microBtn) { microBtn.innerText = 'Tắt Bếp Lửa'; microBtn.style.background = '#ef4444'; }
+            } else {
+                if (fire) fire.classList.remove('active');
+                if (macroBtn) { macroBtn.innerText = 'Bật bếp lửa'; macroBtn.style.background = '#0ea5e9'; }
+                if (microBtn) { microBtn.innerText = 'Bật Bếp Lửa'; microBtn.style.background = '#0ea5e9'; }
+            }
+        }
+
+        // --- Điều khiển Bếp ở Macro View ---
+        function toggleStove(event) {
+            if (event) event.stopPropagation();
+            stoveIsOn = !stoveIsOn;
+            syncStoveUI();
+        }
+
+        function toggleStoveMicro() {
+            stoveIsOn = !stoveIsOn;
+            syncStoveUI();
+        }
+
+        // --- Chuyển đổi qua lại giữa Macro và Micro ---
+        function enterMicroView() {
+            inMicroView = true;
+
+            // Ép buộc bếp luôn Tắt (về mặc định) mỗi khi mới ấn vào nồi
+            stoveIsOn = false;
+            params.temperature = 0.1;
+            syncStoveUI(); 
+
+            document.getElementById('macro-view').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('macro-view').style.display = 'none';
+                document.getElementById('micro-view').style.display = 'block';
+                document.getElementById('controls-panel').style.display = 'block';
+                document.getElementById('back-btn').style.display = 'block';
+                document.getElementById('status-text').innerText = 'Trạng thái: Mô phỏng Vi mô 3D (Bình chứa & Va chạm)';
+
+                initThreeJS();
+            }, 300);
+        }
+
+        function returnToMacroView() {
+            inMicroView = false;
+
+            // 1. Dừng hoàn toàn vòng lặp animation để tránh chạy ngầm gây lỗi hình ảnh đè
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+
+            // 2. Ẩn giao diện micro và hiện macro
+            document.getElementById('micro-view').style.display = 'none';
+            document.getElementById('controls-panel').style.display = 'none';
+            document.getElementById('back-btn').style.display = 'none';
+
+            const macroView = document.getElementById('macro-view');
+            macroView.style.display = 'flex';
+            setTimeout(() => { macroView.style.opacity = '1'; }, 50);
+
+            document.getElementById('status-text').innerText = 'Trạng thái: Đang ở chế độ vĩ mô (Nồi nước)';
+
+            // 3. Xóa sạch đối tượng Three.js cũ khỏi DOM và bộ nhớ
+            const container = document.getElementById('canvas-container');
+            container.innerHTML = '';
+            scene = null;
+            camera = null;
+            renderer = null;
+            if (controls) {
+                controls.dispose();
+                controls = null;
+            }
+            particles = [];
+            trackedLines = [];
+        }
+
+        // --- Khởi tạo không gian 3D Three.js ---
+        function initThreeJS() {
+            const container = document.getElementById('canvas-container');
+            container.innerHTML = ''; // Đảm bảo container trống
+
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0b0f19, 0.015);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 45);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // Thêm điều khiển OrbitControls cho phép người dùng tự xoay
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Ánh sáng môi trường
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const pointLight = new THREE.PointLight(0xffffff, 1.2);
+            pointLight.position.set(20, 30, 20);
+            scene.add(pointLight);
+
+            // Vẽ biên dạng thành nồi 3D trong suốt để quan sát biên giới hạn
+            createPotBoundary();
+
+            // Khởi tạo các hạt phân tử
+            initParticles();
+
+            // Lắng nghe resize màn hình
+            window.addEventListener('resize', onWindowResize);
+
+            // Chạy vòng lặp mô phỏng vật lý
+            animate();
+        }
+
+        // Tạo khung thành nồi 3D hình trụ
+        function createPotBoundary() {
+            const potGroup = new THREE.Group();
+
+            // Khung hình trụ giới hạn (Cylinder wireframe tinh tế)
+            const cylGeo = new THREE.CylinderGeometry(potRadius, potRadius, potHeight, 32);
+            const wireMat = new THREE.MeshBasicMaterial({
+                color: 0x38bdf8,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.25
+            });
+            const potMesh = new THREE.Mesh(cylGeo, wireMat);
+            potGroup.add(potMesh);
+            scene.add(potGroup);
+        }
+
+        function toggleTrails() {
+            params.showTrails = !params.showTrails;
+            trackedLines.forEach(l => {
+                if (l.mesh) l.mesh.visible = params.showTrails;
+            });
+        }
+
+        // Khởi tạo hạt vật lý
+        function initParticles() {
+            particles = [];
+            trackedLines = [];
+
+            const totalParticles = 10 + params.extraCount;
+
+            for (let i = 0; i < totalParticles; i++) {
+                let isTracked = i < 10;
+                let radius = isTracked ? 0.9 : (0.5 * params.particleSize);
+                let mass = isTracked ? 1.0 : params.particleMass;
+                let color = isTracked ? trackedColors[i] : 0x94a3b8;
+
+                // Tạo mesh hình cầu cho hạt
+                const geo = new THREE.SphereGeometry(radius, 16, 16);
+                const mat = new THREE.MeshStandardMaterial({
+                    color: color,
+                    roughness: 0.3,
+                    metalness: 0.2,
+                    emissive: isTracked ? color : 0x000000,
+                    emissiveIntensity: isTracked ? 0.3 : 0.0
+                });
+                const mesh = new THREE.Mesh(geo, mat);
+
+                // Vị trí xuất phát ngẫu nhiên bên trong nồi hình trụ
+                let r = Math.random() * (potRadius - 4);
+                let theta_pos = Math.random() * Math.PI * 2;
+                let pos = new THREE.Vector3(
+                    r * Math.cos(theta_pos),
+                    (Math.random() - 0.5) * (potHeight - 4),
+                    r * Math.sin(theta_pos)
+                );
+                mesh.position.copy(pos);
+                scene.add(mesh);
+
+                // Vận tốc ban đầu ngẫu nhiên dựa trên nhiệt độ
+                let speed = Math.sqrt(params.temperature) * (Math.random() * 0.8 + 0.4);
+                let theta = Math.random() * Math.PI * 2;
+                let phi = Math.acos((Math.random() * 2) - 1);
+                let vel = new THREE.Vector3(
+                    speed * Math.sin(phi) * Math.cos(theta),
+                    speed * Math.sin(phi) * Math.sin(theta),
+                    speed * Math.cos(phi)
+                );
+
+                particles.push({
+                    mesh: mesh,
+                    pos: pos,
+                    vel: vel,
+                    radius: radius,
+                    mass: mass,
+                    isTracked: isTracked,
+                    history: [] // Lưu vết đường đi
+                });
+
+                // Khởi tạo đường line vết đi nếu là hạt được theo dõi
+                if (isTracked) {
+                    const lineGeo = new THREE.BufferGeometry();
+                    const lineMat = new THREE.LineBasicMaterial({ color: color, linewidth: 2, transparent: true, opacity: 0.7 });
+                    const lineMesh = new THREE.Line(lineGeo, lineMat);
+                    scene.add(lineMesh);
+                    trackedLines.push({ mesh: lineMesh, points: [] });
+                }
+            }
+        }
+
+
+
+        function updateParticlesConfig() {
+            particles.forEach(p => {
+                if (!p.isTracked) {
+                    p.radius = 0.5 * params.particleSize;
+                    p.mass = params.particleMass;
+                    p.mesh.scale.set(params.particleSize, params.particleSize, params.particleSize);
+                }
+            });
+        }
+
+        function adjustExtraParticles() {
+            let targetTotal = 10 + params.extraCount;
+
+            // Xóa bớt hạt phụ nếu dư thừa (chỉ xóa hạt không được track)
+            while (particles.length > targetTotal && particles.length > 10) {
+                let p = particles.pop();
+                scene.remove(p.mesh);
+                if (p.mesh.geometry) p.mesh.geometry.dispose();
+                if (p.mesh.material) p.mesh.material.dispose();
+            }
+
+            // Thêm hạt phụ mới nếu thiếu
+            while (particles.length < targetTotal) {
+                let radius = 0.5 * params.particleSize;
+                let mass = params.particleMass;
+                let color = 0x94a3b8;
+
+                const geo = new THREE.SphereGeometry(radius, 16, 16);
+                const mat = new THREE.MeshStandardMaterial({
+                    color: color,
+                    roughness: 0.3,
+                    metalness: 0.2,
+                    transparent: true,
+                    opacity: 0.0 // Bắt đầu tàng hình để hiện từ từ
+                });
+                const mesh = new THREE.Mesh(geo, mat);
+
+                let r = Math.random() * (potRadius - 4);
+                let theta_pos = Math.random() * Math.PI * 2;
+                let pos = new THREE.Vector3(
+                    r * Math.cos(theta_pos),
+                    (Math.random() - 0.5) * (potHeight - 4),
+                    r * Math.sin(theta_pos)
+                );
+                mesh.position.copy(pos);
+                scene.add(mesh);
+
+                let speed = Math.sqrt(params.temperature) * (Math.random() * 0.8 + 0.4);
+                let theta = Math.random() * Math.PI * 2;
+                let phi = Math.acos((Math.random() * 2) - 1);
+                let vel = new THREE.Vector3(
+                    speed * Math.sin(phi) * Math.cos(theta),
+                    speed * Math.sin(phi) * Math.sin(theta),
+                    speed * Math.cos(phi)
+                );
+
+                particles.push({
+                    mesh: mesh,
+                    pos: pos,
+                    vel: vel,
+                    radius: radius,
+                    mass: mass,
+                    isTracked: false,
+                    history: []
+                });
+            }
+
+            // Cập nhật lại config (scale/mass) cho đồng bộ toàn bộ hệ thống
+            updateParticlesConfig();
+        }
+
+        // Hàm tạo số ngẫu nhiên theo phân phối Chuẩn (Gaussian) bằng phương pháp Box-Muller
+        function randn_bm() {
+            let u = 0, v = 0;
+            while (u === 0) u = Math.random();
+            while (v === 0) v = Math.random();
+            return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        }
+
+        // --- Vòng lặp vật lý & Va chạm đàn hồi (Định luật Newton & Bảo toàn động lượng) ---
+        function animate() {
+            if (!inMicroView) return; // Dừng lập tức nếu không ở màn hình micro
+
+            animationFrameId = requestAnimationFrame(animate);
+
+            // Cập nhật vị trí từng hạt
+            for (let i = 0; i < particles.length; i++) {
+                let p = particles[i];
+
+                // Hiện từ từ (Fade in) cho hạt phụ mới thêm
+                if (p.mesh.material.transparent && p.mesh.material.opacity < 1.0) {
+                    p.mesh.material.opacity += 0.05;
+                    if (p.mesh.material.opacity >= 1.0) {
+                        p.mesh.material.opacity = 1.0;
+                        p.mesh.material.transparent = false; // Tắt transparent khi đã hiện rõ để tối ưu
+                    }
+                }
+
+                // --- Phương trình Langevin (Random Walk 3D cho hạt có khối lượng) ---
+                // Hệ số cản của môi trường (Viscous drag)
+                let gamma = 0.05;
+                let dt = 1.0;
+
+                // Biên độ nhiễu ngẫu nhiên dựa trên nhiệt độ và khối lượng (Hệ thức Fluctuation-Dissipation)
+                let sigma = Math.sqrt((2 * gamma * params.temperature) / p.mass) * 0.4;
+
+                // Lực nhiễu Gauss (Wiener Process)
+                let noiseForce = new THREE.Vector3(
+                    randn_bm() * sigma,
+                    randn_bm() * sigma,
+                    randn_bm() * sigma
+                );
+
+                // Lực cản nhớt tỉ lệ thuận với vận tốc
+                let dragForce = p.vel.clone().multiplyScalar(-gamma / p.mass * dt);
+
+                // Cập nhật vận tốc dựa trên nhiễu và lực cản
+                p.vel.add(dragForce).add(noiseForce);
+
+                // Cập nhật tọa độ
+                p.pos.add(p.vel.clone().multiplyScalar(dt));
+
+                // --- 1. Xử lý va chạm đàn hồi với biên thành nồi hình trụ 3D ---
+                let halfH = potHeight / 2 - p.radius;
+
+                // Va chạm nắp và đáy
+                if (p.pos.y > halfH) { p.pos.y = halfH; p.vel.y *= -1; }
+                if (p.pos.y < -halfH) { p.pos.y = -halfH; p.vel.y *= -1; }
+
+                // Va chạm thành trụ tròn xung quanh
+                let maxR = potRadius - p.radius;
+                let currentR = Math.sqrt(p.pos.x * p.pos.x + p.pos.z * p.pos.z);
+
+                if (currentR > maxR) {
+                    // Đẩy hạt ngược vào trong biên
+                    let nx = p.pos.x / currentR;
+                    let nz = p.pos.z / currentR;
+                    p.pos.x = nx * maxR;
+                    p.pos.z = nz * maxR;
+
+                    // Phản xạ vận tốc theo pháp tuyến bề mặt trụ
+                    let dot = p.vel.x * nx + p.vel.z * nz;
+                    if (dot > 0) { // Đang hướng ra ngoài
+                        p.vel.x -= 2 * dot * nx;
+                        p.vel.z -= 2 * dot * nz;
+                    }
+                }
+
+                // --- 2. Xử lý va chạm đàn hồi giữa các hạt (Bảo toàn động lượng & Động năng) ---
+                for (let j = i + 1; j < particles.length; j++) {
+                    let p2 = particles[j];
+                    let distVec = new THREE.Vector3().subVectors(p2.pos, p.pos);
+                    let distance = distVec.length();
+                    let minDist = p.radius + p2.radius;
+
+                    if (distance < minDist) {
+                        // Xảy ra va chạm chồng lấp -> đẩy lùi vị trí để tránh dính nhau
+                        let overlap = 0.5 * (minDist - distance);
+                        let normal = distVec.clone().normalize();
+                        p.pos.addScaledVector(normal, -overlap);
+                        p2.pos.addScaledVector(normal, overlap);
+
+                        // Tính toán vận tốc sau va chạm đàn hồi 3D theo định luật bảo toàn động lượng
+                        let kx = p.vel.x - p2.vel.x;
+                        let ky = p.vel.y - p2.vel.y;
+                        let kz = p.vel.z - p2.vel.z;
+                        let pn = kx * normal.x + ky * normal.y + kz * normal.z;
+
+                        if (pn > 0) {
+                            let m1 = p.mass;
+                            let m2 = p2.mass;
+                            let factor = (2 * pn) / (m1 + m2);
+
+                            p.vel.addScaledVector(normal, -factor * m2);
+                            p2.vel.addScaledVector(normal, factor * m1);
+                        }
+                    }
+                }
+
+                // Cập nhật vị trí Mesh 3D thực tế
+                p.mesh.position.copy(p.pos);
+
+                // Cập nhật đường đi cho 10 hạt đầu tiên
+                if (p.isTracked && params.showTrails) {
+                    let trail = trackedLines[i];
+                    trail.points.push(p.pos.clone());
+                    if (trail.points.length > 60) trail.points.shift(); // Giới hạn chiều dài vết
+
+                    const ptsGeo = new THREE.BufferGeometry().setFromPoints(trail.points);
+                    trail.mesh.geometry.dispose();
+                    trail.mesh.geometry = ptsGeo;
+                }
+            }
+
+            // Cập nhật hệ thống OrbitControls cho phép người dùng tự xoay
+            if (controls) controls.update();
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            if (!inMicroView || !camera || !renderer) return;
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+    </script>
+</body>
+
+</html>

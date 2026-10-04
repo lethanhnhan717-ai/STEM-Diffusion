@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mô phỏng Gã Say Rượu - Random Walk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #38bdf8, #818cf8, #e879f9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        input[type=range] {
+            accent-color: #818cf8;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 md:p-6 gap-6">
+
+    <header class="text-center w-full max-w-7xl mx-auto">
+        <h1 class="text-3xl md:text-5xl font-bold mb-3"><span class="gradient-text">Bài Toán Gã Say Rượu</span> 🍻</h1>
+        <p class="text-slate-400 text-sm md:text-base">Mô hình Bước Đi Ngẫu Nhiên Rời Rạc (Discrete Random Walk) trong Không Gian 1D, 2D và 3D</p>
+    </header>
+
+    <main class="flex-grow w-full max-w-[98vw] mx-auto grid grid-cols-1 xl:grid-cols-4 gap-6">
+        
+        <!-- Bảng điều khiển (Sidebar) -->
+        <aside class="glass-panel rounded-2xl p-5 xl:col-span-1 flex flex-col gap-5 h-fit max-h-full overflow-y-auto">
+            
+            <!-- Box Bối cảnh -->
+            <div id="contextBox" class="p-4 rounded-xl bg-slate-800/80 border border-slate-700 transition-colors duration-300">
+                <h3 id="contextTitle" class="font-bold text-lg text-indigo-400 mb-2 flex items-center gap-2">
+                    <span>🏙️</span> Quảng trường (2D)
+                </h3>
+                <p id="contextDesc" class="text-sm text-slate-300 leading-relaxed">
+                    Gã say đứng giữa quảng trường. Ở mỗi bước, anh ta đi ngẫu nhiên 1 trong 4 hướng (Bắc, Nam, Đông, Tây).
+                </p>
+            </div>
+
+            <hr class="border-slate-700">
+
+            <!-- Các điều khiển -->
+            <div class="flex flex-col gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-200 mb-1">Không gian:</label>
+                    <select id="dimSelect" class="w-full bg-slate-800 border border-slate-600 text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="1">1D - Con hẻm hẹp (2 Hướng)</option>
+                        <option value="2" selected>2D - Quảng trường (4 Hướng)</option>
+                        <option value="3">3D - Không trọng lực (6 Hướng)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold text-slate-200">Số gã say (Hạt):</label>
+                        <span id="numDrunksVal" class="text-sm font-bold text-blue-400">5</span>
+                    </div>
+                    <input type="range" id="numDrunks" min="1" max="50" value="5" class="w-full">
+                </div>
+
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold text-slate-200">Số bước di chuyển:</label>
+                        <span id="numStepsVal" class="text-sm font-bold text-fuchsia-400">200</span>
+                    </div>
+                    <input type="range" id="numSteps" min="10" max="500" value="200" class="w-full">
+                </div>
+
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold text-slate-200">Tốc độ (FPS):</label>
+                        <span id="speedVal" class="text-sm font-bold text-emerald-400">30</span>
+                    </div>
+                    <input type="range" id="speed" min="1" max="60" value="30" class="w-full">
+                </div>
+            </div>
+
+            <!-- Nút điều khiển Animation -->
+            <div class="grid grid-cols-2 gap-3 mt-2">
+                <button id="btnReset" class="col-span-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                    🔄 Tạo dữ liệu mới
+                </button>
+                <button id="btnPlay" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition-colors flex items-center justify-center gap-1">
+                    ▶ Play
+                </button>
+                <button id="btnPause" class="bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition-colors flex items-center justify-center gap-1">
+                    ⏸ Pause
+                </button>
+            </div>
+            
+            <div class="text-center mt-2">
+                <p class="text-sm text-slate-400">Tiến trình: <span id="progressText" class="font-bold text-white">0</span> / <span id="progressTotal">200</span> bước</p>
+            </div>
+        </aside>
+
+        <div class="glass-panel rounded-2xl xl:col-span-3 min-h-[600px] h-[75vh] xl:h-auto relative overflow-hidden flex flex-col p-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full h-full flex-grow">
+                <!-- Biểu đồ 1: Quỹ đạo -->
+                <div id="plotlyChart" class="w-full h-full min-h-[300px]"></div>
+                <!-- Biểu đồ 2: Khoảng cách -->
+                <div id="plotlyDistanceChart" class="w-full h-full min-h-[300px]"></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- 1. Lấy các phần tử DOM ---
+        const ui = {
+            dimSelect: document.getElementById('dimSelect'),
+            numDrunks: document.getElementById('numDrunks'),
+            numSteps: document.getElementById('numSteps'),
+            speed: document.getElementById('speed'),
+            numDrunksVal: document.getElementById('numDrunksVal'),
+            numStepsVal: document.getElementById('numStepsVal'),
+            speedVal: document.getElementById('speedVal'),
+            btnPlay: document.getElementById('btnPlay'),
+            btnPause: document.getElementById('btnPause'),
+            btnReset: document.getElementById('btnReset'),
+            chart: document.getElementById('plotlyChart'),
+            distChart: document.getElementById('plotlyDistanceChart'),
+            contextTitle: document.getElementById('contextTitle'),
+            contextDesc: document.getElementById('contextDesc'),
+            progressText: document.getElementById('progressText'),
+            progressTotal: document.getElementById('progressTotal')
+        };
+
+        // --- 2. Trạng thái toàn cục ---
+        let state = {
+            dim: 2,
+            drunks: 5,
+            steps: 200,
+            fps: 30,
+            currentStep: 0,
+            isPlaying: false,
+            animationTimer: null,
+            walksData: [], // Lưu trữ quỹ đạo
+            maxLimit: 10,  // Giới hạn trục toạ độ (Vị trí)
+            maxDist: 10    // Giới hạn trục khoảng cách (Độ xa)
+        };
+
+        // Bảng màu cho các quỹ đạo
+        const colorPalette = [
+            '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', 
+            '#ec4899', '#14b8a6', '#f43f5e', '#84cc16', '#0ea5e9',
+            '#d946ef', '#f97316', '#06b6d4', '#eab308', '#6366f1'
+        ];
+        function getColor(i) { return colorPalette[i % colorPalette.length]; }
+
+        // --- STREAMING_CHUNK: Hàm Cập nhật Bối cảnh (Context) ---
+        function updateContext() {
+            state.dim = parseInt(ui.dimSelect.value);
+            if (state.dim === 1) {
+                ui.contextTitle.innerHTML = "🚶‍♂️ Con hẻm hẹp (1D)";
+                ui.contextDesc.innerText = "Gã say chỉ tiến hoặc lùi. Biểu đồ Quỹ đạo (trái) vẽ sự thay đổi Vị trí theo Thời gian. Biểu đồ Khoảng cách (phải) đo độ xa tuyệt đối so với điểm gốc.";
+            } else if (state.dim === 2) {
+                ui.contextTitle.innerHTML = "🚶‍♂️ Quảng trường (2D)";
+                ui.contextDesc.innerText = "Gã say đi ngẫu nhiên 4 hướng. Biểu đồ trái mô tả quỹ đạo loạng choạng nhìn từ trên cao. Biểu đồ phải đo khoảng cách đường chim bay.";
+            } else if (state.dim === 3) {
+                ui.contextTitle.innerHTML = "🚁 Drone hỏng cảm biến (3D)";
+                ui.contextDesc.innerText = "Drone bay hỗn loạn theo 6 hướng trong không gian. Biểu đồ trái là không gian bay 3D thực tế, biểu đồ phải là khoảng cách drone lọt khỏi điểm xuất phát.";
+            }
+        }
+
+        // --- STREAMING_CHUNK: Thuật toán Sinh dữ liệu Random Walk Rời rạc ---
+        function generateWalks() {
+            state.drunks = parseInt(ui.numDrunks.value);
+            state.steps = parseInt(ui.numSteps.value);
+            ui.progressTotal.innerText = state.steps;
+            
+            state.walksData = [];
+            state.maxLimit = 0;
+            state.maxDist = 0;
+
+            for (let i = 0; i < state.drunks; i++) {
+                let walk = { t: [0], x: [0], y: [0], z: [0], dist: [0] };
+                let cx = 0, cy = 0, cz = 0;
+
+                for (let s = 1; s <= state.steps; s++) {
+                    if (state.dim === 1) {
+                        cx += (Math.random() < 0.5) ? 1 : -1;
+                        cy = 0; // Đưa về 0 vì biểu diễn đồ thị sẽ dùng trục thời gian riêng
+                    } 
+                    else if (state.dim === 2) {
+                        const r = Math.floor(Math.random() * 4);
+                        if (r === 0) cx += 1;
+                        else if (r === 1) cx -= 1;
+                        else if (r === 2) cy += 1;
+                        else cy -= 1;
+                    } 
+                    else if (state.dim === 3) {
+                        const r = Math.floor(Math.random() * 6);
+                        if (r === 0) cx += 1;
+                        else if (r === 1) cx -= 1;
+                        else if (r === 2) cy += 1;
+                        else if (r === 3) cy -= 1;
+                        else if (r === 4) cz += 1;
+                        else cz -= 1;
+                    }
+                    
+                    // Tính khoảng cách Euclidean
+                    let currentDist = Math.sqrt(cx*cx + cy*cy + cz*cz);
+
+                    walk.t.push(s);
+                    walk.x.push(cx);
+                    walk.y.push(cy);
+                    walk.z.push(cz);
+                    walk.dist.push(currentDist);
+                    
+                    // Cập nhật Min/Max cho khung đồ thị
+                    let currentMax = Math.max(Math.abs(cx), Math.abs(cy), Math.abs(cz));
+                    if (currentMax > state.maxLimit) state.maxLimit = currentMax;
+                    if (currentDist > state.maxDist) state.maxDist = currentDist;
+                }
+                state.walksData.push(walk);
+            }
+            
+            state.maxLimit = Math.max(5, state.maxLimit + 2);
+            state.maxDist = Math.max(5, Math.ceil(state.maxDist + 2));
+        }
+
+        // --- STREAMING_CHUNK: Cấu hình Layout Đồ thị Plotly ---
+        function getPlotLayout() {
+            const bg = 'rgba(0,0,0,0)';
+            const gridCol = '#334155';
+            const zeroCol = '#94a3b8';
+            
+            let layout = {
+                paper_bgcolor: bg, plot_bgcolor: bg,
+                font: { color: '#e2e8f0', family: 'Inter' },
+                margin: { l: 40, r: 20, t: 40, b: 40 },
+                showlegend: false,
+                hovermode: false,
+                transition: { duration: 0 }
+            };
+
+            if (state.dim === 1) {
+                layout.title = 'Vị trí theo thời gian (1D)';
+                layout.xaxis = { title: 'Thời gian (Số bước)', range: [0, state.steps], gridcolor: gridCol, zerolinecolor: zeroCol };
+                layout.yaxis = { title: 'Vị trí X', range: [-state.maxLimit, state.maxLimit], gridcolor: gridCol, zerolinecolor: '#ef4444', zerolinewidth: 2 };
+            } 
+            else if (state.dim === 2) {
+                layout.title = 'Quỹ đạo (2D)';
+                layout.xaxis = { title: 'Trục X', range: [-state.maxLimit, state.maxLimit], gridcolor: gridCol, zerolinecolor: zeroCol };
+                layout.yaxis = { title: 'Trục Y', range: [-state.maxLimit, state.maxLimit], gridcolor: gridCol, zerolinecolor: zeroCol, scaleanchor: 'x' };
+            } 
+            else if (state.dim === 3) {
+                layout.title = 'Quỹ đạo (3D)';
+                layout.margin = { l: 0, r: 0, t: 30, b: 0 };
+                layout.scene = {
+                    xaxis: { title: 'X', range: [-state.maxLimit, state.maxLimit], gridcolor: gridCol, zerolinecolor: zeroCol, backgroundcolor: '#1e293b', showbackground: true },
+                    yaxis: { title: 'Y', range: [-state.maxLimit, state.maxLimit], gridcolor: gridCol, zerolinecolor: zeroCol, backgroundcolor: '#1e293b', showbackground: true },
+                    zaxis: { title: 'Z', range: [-state.maxLimit, state.maxLimit], gridcolor: gridCol, zerolinecolor: zeroCol, backgroundcolor: '#1e293b', showbackground: true },
+                    camera: { eye: {x: 1.5, y: 1.5, z: 1.2} }
+                };
+            }
+            return layout;
+        }
+
+        function getDistancePlotLayout() {
+            const bg = 'rgba(0,0,0,0)';
+            const gridCol = '#334155';
+            return {
+                paper_bgcolor: bg, plot_bgcolor: bg,
+                font: { color: '#e2e8f0', family: 'Inter' },
+                margin: { l: 40, r: 20, t: 40, b: 40 },
+                showlegend: false,
+                hovermode: false,
+                title: 'Khoảng cách so với Gốc',
+                xaxis: { title: 'Thời gian (Bước)', range: [0, state.steps], gridcolor: gridCol },
+                yaxis: { title: 'Khoảng cách (d)', range: [0, state.maxDist], gridcolor: gridCol, zerolinecolor: '#94a3b8' },
+                transition: { duration: 0 }
+            };
+        }
+
+        // --- STREAMING_CHUNK: Logic Render Frame Animation ---
+        function renderStep() {
+            try {
+                let trajTraces = [];
+                let distTraces = [];
+                let headX = [], headY = [], headZ = [], headTexts = [], headColors = [];
+                let distHeadX = [], distHeadY = [], distHeadColors = [];
+
+                // Cài đặt Icon
+                const icon = state.dim === 3 ? '🚁' : '🚶‍♂️';
+                
+                // 1. Trace tâm (Ngôi nhà) cho đồ thị quỹ đạo
+                if(state.dim !== 1) {
+                    trajTraces.push({
+                        x: [0], y: [0], z: state.dim === 3 ? [0] : undefined,
+                        mode: 'text',
+                        type: state.dim === 3 ? 'scatter3d' : 'scatter',
+                        text: ['🏠'],
+                        textfont: { size: 22 }
+                    });
+                }
+
+                // 2. Data Prep & Line Traces
+                for (let i = 0; i < state.drunks; i++) {
+                    let w = state.walksData[i];
+                    let c = getColor(i);
+                    
+                    // --- Vẽ Đồ thị Quỹ đạo ---
+                    let tx, ty, tz;
+                    if (state.dim === 1) {
+                        tx = w.t.slice(0, state.currentStep + 1); // Trục X là Thời gian
+                        ty = w.x.slice(0, state.currentStep + 1); // Trục Y là Vị trí
+                    } else {
+                        tx = w.x.slice(0, state.currentStep + 1);
+                        ty = w.y.slice(0, state.currentStep + 1);
+                        tz = state.dim === 3 ? w.z.slice(0, state.currentStep + 1) : undefined;
+                    }
+
+                    trajTraces.push({
+                        x: tx, y: ty, z: tz,
+                        mode: 'lines',
+                        type: state.dim === 3 ? 'scatter3d' : 'scatter',
+                        line: { width: 2, color: c },
+                        opacity: 0.5
+                    });
+                    
+                    headX.push(tx[tx.length - 1]);
+                    headY.push(ty[ty.length - 1]);
+                    if (state.dim === 3) headZ.push(tz[tz.length - 1]);
+                    headTexts.push(icon);
+                    headColors.push(c);
+
+                    // --- Vẽ Đồ thị Khoảng cách ---
+                    let dt = w.t.slice(0, state.currentStep + 1);
+                    let dd = w.dist.slice(0, state.currentStep + 1);
+                    
+                    distTraces.push({
+                        x: dt, y: dd,
+                        mode: 'lines', type: 'scatter',
+                        line: { width: 2, color: c },
+                        opacity: 0.6
+                    });
+
+                    distHeadX.push(dt[dt.length - 1]);
+                    distHeadY.push(dd[dd.length - 1]);
+                    distHeadColors.push(c);
+                }
+
+                // 3. Traces cho Icon ở Đầu (Heads)
+                trajTraces.push({
+                    x: headX, y: headY, z: state.dim === 3 ? headZ : undefined,
+                    mode: 'markers+text', // Markers để hiện đốm màu nhận diện, Text để hiện Emoji
+                    type: state.dim === 3 ? 'scatter3d' : 'scatter',
+                    text: headTexts,
+                    textfont: { size: 24 },
+                    textposition: 'top center',
+                    marker: { size: 6, color: headColors, line: {color: 'white', width: 1} }
+                });
+
+                distTraces.push({
+                    x: distHeadX, y: distHeadY,
+                    mode: 'markers', type: 'scatter',
+                    marker: { size: 8, color: distHeadColors, line: {color: 'white', width: 1} }
+                });
+
+                // Cập nhật DOM
+                ui.progressText.innerText = state.currentStep;
+
+                // Plotly React (Cập nhật 2 biểu đồ song song)
+                Plotly.react(ui.chart, trajTraces, getPlotLayout(), {responsive: true, displayModeBar: false});
+                Plotly.react(ui.distChart, distTraces, getDistancePlotLayout(), {responsive: true, displayModeBar: false});
+            } catch (err) {
+                console.error("Lỗi Render Đồ thị:", err);
+                pauseAnimation();
+            }
+        }
+
+        // --- STREAMING_CHUNK: Quản lý vòng lặp Animation ---
+        function stepAnimation() {
+            if (!state.isPlaying) return;
+            
+            if (state.currentStep >= state.steps) {
+                pauseAnimation();
+                return;
+            }
+            
+            state.currentStep++;
+            renderStep();
+        }
+
+        function playAnimation() {
+            if (state.currentStep >= state.steps) {
+                state.currentStep = 0;
+            }
+            state.isPlaying = true;
+            ui.btnPlay.classList.add('opacity-50', 'cursor-not-allowed');
+            ui.btnPause.classList.remove('opacity-50', 'cursor-not-allowed');
+            
+            if(state.animationTimer) clearInterval(state.animationTimer);
+            
+            const intervalMs = 1000 / state.fps;
+            state.animationTimer = setInterval(stepAnimation, intervalMs);
+        }
+
+        function pauseAnimation() {
+            state.isPlaying = false;
+            ui.btnPlay.classList.remove('opacity-50', 'cursor-not-allowed');
+            ui.btnPause.classList.add('opacity-50', 'cursor-not-allowed');
+            if(state.animationTimer) clearInterval(state.animationTimer);
+        }
+
+        function resetSimulation() {
+            pauseAnimation();
+            updateContext();
+            generateWalks();
+            state.currentStep = 0;
+            renderStep();
+        }
+
+        // --- STREAMING_CHUNK: Lắng nghe Sự kiện UI ---
+        ui.numDrunks.addEventListener('input', (e) => ui.numDrunksVal.innerText = e.target.value);
+        ui.numSteps.addEventListener('input', (e) => {
+            ui.numStepsVal.innerText = e.target.value;
+            ui.progressTotal.innerText = e.target.value;
+        });
+        ui.speed.addEventListener('input', (e) => {
+            ui.speedVal.innerText = e.target.value;
+            state.fps = parseInt(e.target.value);
+            if (state.isPlaying) {
+                playAnimation(); 
+            }
+        });
+
+        ui.btnPlay.addEventListener('click', () => { if(!state.isPlaying) playAnimation(); });
+        ui.btnPause.addEventListener('click', pauseAnimation);
+        ui.btnReset.addEventListener('click', resetSimulation);
+        ui.dimSelect.addEventListener('change', resetSimulation);
+
+        // Khởi tạo lần đầu
+        window.onload = () => {
+            resetSimulation();
+            
+            window.addEventListener('resize', () => {
+                Plotly.Plots.resize(ui.chart);
+                Plotly.Plots.resize(ui.distChart);
+            });
+        };
+
+    </script>
+</body>
+</html>
